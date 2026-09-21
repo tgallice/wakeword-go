@@ -3,6 +3,7 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -61,18 +62,44 @@ func TestNewInterpreterAllocates(t *testing.T) {
 			t.Errorf("variable %d: %d bytes, want %d", vi, len(it.Variable(vi)), v.ByteSize)
 		}
 	}
-	if err := it.Invoke(); !errors.Is(err, ErrNotImplemented) {
-		t.Errorf("Invoke: got %v, want ErrNotImplemented", err)
+	// Without the kernels package, Invoke initializes the state (CALL_ONCE) and then stops
+	// at the first arithmetic operator, naming it.
+	err = it.Invoke()
+	if !errors.Is(err, ErrNoKernel) || !strings.Contains(err.Error(), "operator 7 (RESHAPE)") {
+		t.Errorf("Invoke: got %v, want ErrNoKernel naming operator 7 (RESHAPE)", err)
 	}
-	if err := it.Reset(); !errors.Is(err, ErrNotImplemented) {
-		t.Errorf("Reset: got %v, want ErrNotImplemented", err)
+	if !it.Initialized() {
+		t.Error("Invoke did not run the init subgraph before failing")
 	}
+	assertInitState(t, it)
+	// Dirty the state, Reset restores the init constants.
+	for vi := range m.Variables {
+		it.Variable(vi)[0] = 7
+	}
+	if err := it.Reset(); err != nil {
+		t.Fatalf("Reset: %v", err)
+	}
+	assertInitState(t, it)
 	// Int32 constants are readable as little-endian values (the RESHAPE target shape).
 	for _, op := range m.Main().Operators {
 		if op.Name == "RESHAPE" {
 			shape := it.Tensor(0, op.Inputs[1]).Int32()
 			if len(shape) == 4 && (shape[0] != 1 || shape[1] != 3 || shape[2] != 1 || shape[3] != 40) {
 				t.Errorf("RESHAPE shape constant: %v", shape)
+			}
+		}
+	}
+}
+
+// assertInitState checks every variable holds the init constant of the model (0x80 bytes).
+func assertInitState(t *testing.T, it *Interpreter) {
+	t.Helper()
+	for vi, v := range it.Model().Variables {
+		state := it.Variable(vi)
+		for i, b := range state {
+			if b != 0x80 {
+				t.Errorf("variable %d (%s): byte %d is %#x, want 0x80", vi, v.SharedName, i, b)
+				break
 			}
 		}
 	}

@@ -290,6 +290,9 @@ func (sg *Subgraph) validateOperator(m *Model, oi int) error {
 		if !in(0).Quant.Equal(out(0).Quant) {
 			return errors.New("input and output quantization differ")
 		}
+		if err := checkReshapeTarget(in(1), out(0)); err != nil {
+			return err
+		}
 		return nil
 	case tflite.BuiltinOperatorVAR_HANDLE:
 		if err := arity(0, 1); err != nil {
@@ -325,6 +328,49 @@ func (sg *Subgraph) validateOperator(m *Model, oi int) error {
 	default:
 		return fmt.Errorf("no validation rule for %s", op.Name)
 	}
+}
+
+// checkReshapeTarget checks that the constant shape tensor of a RESHAPE, with at most one -1
+// wildcard resolved against the element count, equals the output shape.
+func checkReshapeTarget(shape, out *TensorInfo) error {
+	want := int32sOf(shape.Const)
+	if len(want) != len(out.Shape) {
+		return fmt.Errorf("shape parameter has %d dimensions, output has %d", len(want), len(out.Shape))
+	}
+	wild := -1
+	known := 1
+	for i, d := range want {
+		switch {
+		case d == -1 && wild < 0:
+			wild = i
+		case d < 0:
+			return fmt.Errorf("shape parameter %v has more than one wildcard", want)
+		default:
+			known *= int(d)
+		}
+	}
+	for i, d := range want {
+		v := int(d)
+		if i == wild {
+			if known == 0 {
+				return fmt.Errorf("shape parameter %v cannot resolve its wildcard", want)
+			}
+			v = out.NumElements / known
+		}
+		if v != out.Shape[i] {
+			return fmt.Errorf("shape parameter %v does not match output shape %v", want, out.Shape)
+		}
+	}
+	return nil
+}
+
+// int32sOf decodes a little-endian int32 constant buffer.
+func int32sOf(b []byte) []int32 {
+	out := make([]int32, len(b)/4)
+	for i := range out {
+		out[i] = int32(uint32(b[4*i]) | uint32(b[4*i+1])<<8 | uint32(b[4*i+2])<<16 | uint32(b[4*i+3])<<24)
+	}
+	return out
 }
 
 // checkDTypes takes (tensor, dtype) pairs and checks each tensor is present with that dtype.

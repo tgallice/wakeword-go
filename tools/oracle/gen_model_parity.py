@@ -4,7 +4,8 @@
 For each model in testdata/models/v2, produces testdata/parity/<name>.json containing:
   - the input/output contract (index, shape, dtype, quantization);
   - sequences of int8 [1,3,40] frames with the expected uint8 output at each step,
-    the streaming state being kept between steps and reset between sequences;
+    the streaming state being kept between steps; every sequence starts from a fresh
+    interpreter, so its variables hold the init constants of the CALL_ONCE subgraph;
   - full traces (value of all non-constant tensors after each step)
     to test each operator in isolation.
 
@@ -76,10 +77,14 @@ def make_sequences(rng, n_random, steps):
 def run_model(name, n_random, steps, trace_steps, seed):
     path = MODELS_DIR / f"{name}.tflite"
     consts = constant_tensor_indices(path)
-    it = Interpreter(model_path=str(path),
-                     experimental_op_resolver_type=OpResolverType.BUILTIN_REF,
-                     experimental_preserve_all_tensors=True)
-    it.allocate_tensors()
+    def new_interpreter():
+        it = Interpreter(model_path=str(path),
+                         experimental_op_resolver_type=OpResolverType.BUILTIN_REF,
+                         experimental_preserve_all_tensors=True)
+        it.allocate_tensors()
+        return it
+
+    it = new_interpreter()
     inp = it.get_input_details()[0]
     out = it.get_output_details()[0]
     assert inp["dtype"] == np.int8 and out["dtype"] == np.uint8
@@ -92,7 +97,11 @@ def run_model(name, n_random, steps, trace_steps, seed):
     sequences = []
     traces = []
     for si, (label, frames) in enumerate(make_sequences(rng, n_random, steps)):
-        it.reset_all_variables()
+        # A fresh interpreter per sequence: CALL_ONCE runs the init subgraph again, so every
+        # sequence starts from the init constants (-128 everywhere). reset_all_variables()
+        # does NOT do that: it leaves resource variables untouched (measured with litert 2.2.0).
+        if si > 0:
+            it = new_interpreter()
         rec = {"name": label, "steps": []}
         for k in range(steps):
             it.set_tensor(inp["index"], frames[k])
@@ -119,6 +128,7 @@ def run_model(name, n_random, steps, trace_steps, seed):
         "model": f"{name}.tflite",
         "generator": "tools/oracle/gen_model_parity.py",
         "resolver": "BUILTIN_REF",
+        "sequence_start": "fresh_interpreter",
         "seed": seed,
         "input": io_desc(inp),
         "output": io_desc(out),

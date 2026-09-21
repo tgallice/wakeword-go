@@ -6,9 +6,9 @@ import (
 	"unsafe"
 )
 
-// ErrNotImplemented is returned by Invoke and Reset while the kernels of later phases are not
-// registered yet.
-var ErrNotImplemented = errors.New("runtime: not implemented")
+// ErrNoKernel is returned by Invoke and RunOperator when an operator has no registered
+// kernel. Every supported operator gets one once the kernels package is imported.
+var ErrNoKernel = errors.New("runtime: no kernel registered")
 
 // Tensor is a tensor with storage: either a constant aliased from the model or a buffer owned
 // by the interpreter. Resource tensors have no Data.
@@ -51,6 +51,19 @@ func (t *Tensor) SetInt8(values []int8) error {
 		return fmt.Errorf("tensor %s has %d elements, got %d", t.Info.Name, t.Info.NumElements, len(values))
 	}
 	copy(t.Int8(), values)
+	return nil
+}
+
+// SetBytes copies raw bytes into a dynamic tensor. It fails if the length does not match or
+// the tensor is a constant.
+func (t *Tensor) SetBytes(b []byte) error {
+	if t.Info.IsConst() {
+		return fmt.Errorf("tensor %s is constant", t.Info.Name)
+	}
+	if len(b) != len(t.Data) {
+		return fmt.Errorf("tensor %s has %d bytes, got %d", t.Info.Name, len(t.Data), len(b))
+	}
+	copy(t.Data, b)
 	return nil
 }
 
@@ -118,25 +131,78 @@ func (it *Interpreter) Tensor(subgraph, index int) *Tensor {
 	return &it.tensors[subgraph][index]
 }
 
-// Variable returns the state buffer of a variable.
-func (it *Interpreter) Variable(i int) []byte { return it.variables[i] }
-
-// Invoke runs the main subgraph once. Until every operator of the model has a registered
-// kernel it fails with ErrNotImplemented, naming the first operator without one.
-func (it *Interpreter) Invoke() error {
-	for si := range it.model.Subgraphs {
-		for oi := range it.model.Subgraphs[si].Operators {
-			op := &it.model.Subgraphs[si].Operators[oi]
-			if supportedOps[op.Code].kernel == nil {
-				return fmt.Errorf("%w: no kernel for subgraph %d operator %d (%s)", ErrNotImplemented, si, oi, op.Name)
-			}
-		}
-	}
-	return fmt.Errorf("%w: Invoke scheduling arrives with the kernels", ErrNotImplemented)
+// In returns the k-th input tensor of an operator, in the operator's subgraph.
+func (it *Interpreter) In(op *Operator, k int) *Tensor {
+	return &it.tensors[op.Subgraph][op.Inputs[k]]
 }
 
-// Reset puts the state variables back into their initial state, as after the first Invoke.
+// Out returns the k-th output tensor of an operator, in the operator's subgraph.
+func (it *Interpreter) Out(op *Operator, k int) *Tensor {
+	return &it.tensors[op.Subgraph][op.Outputs[k]]
+}
+
+// Variable returns the state buffer of a variable. Writing into the returned slice changes
+// the interpreter state.
+func (it *Interpreter) Variable(i int) []byte { return it.variables[i] }
+
+// Initialized reports whether the init subgraph has run since creation or the last Reset.
+func (it *Interpreter) Initialized() bool { return it.initialized }
+
+// Invoke runs the main subgraph once. The init subgraph runs first if it has not run yet
+// (CALL_ONCE). Any operator without a registered kernel makes Invoke fail with ErrNoKernel,
+// naming the operator and its index.
+func (it *Interpreter) Invoke() error {
+	return it.runSubgraph(0)
+}
+
+// Reset puts the state variables back into their initial state by re-running the init
+// subgraph, as a fresh interpreter would on its first Invoke. Models without an init subgraph
+// have their variables zeroed.
 func (it *Interpreter) Reset() error {
 	it.initialized = false
-	return fmt.Errorf("%w: Reset arrives with the variable kernels", ErrNotImplemented)
+	if it.model.InitSubgraph < 0 {
+		for _, v := range it.variables {
+			clear(v)
+		}
+		it.initialized = true
+		return nil
+	}
+	return it.runInit()
+}
+
+// RunOperator executes one operator against the current tensor contents, without running
+// anything else. It exists for tests that check a single kernel against oracle traces.
+func (it *Interpreter) RunOperator(subgraph, index int) error {
+	op := &it.model.Subgraphs[subgraph].Operators[index]
+	return it.run(op)
+}
+
+func (it *Interpreter) runSubgraph(si int) error {
+	ops := it.model.Subgraphs[si].Operators
+	for oi := range ops {
+		if err := it.run(&ops[oi]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (it *Interpreter) run(op *Operator) error {
+	k := supportedOps[op.Code].kernel
+	if k == nil {
+		return fmt.Errorf("%w for subgraph %d operator %d (%s)", ErrNoKernel, op.Subgraph, op.Index, op.Name)
+	}
+	if err := k(it, op); err != nil {
+		return fmt.Errorf("subgraph %d operator %d (%s): %w", op.Subgraph, op.Index, op.Name, err)
+	}
+	return nil
+}
+
+// runInit executes the init subgraph and marks the interpreter initialized.
+func (it *Interpreter) runInit() error {
+	if err := it.runSubgraph(it.model.InitSubgraph); err != nil {
+		return fmt.Errorf("init subgraph: %w", err)
+	}
+	it.initialized = true
+	return nil
 }

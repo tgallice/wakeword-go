@@ -46,10 +46,12 @@ func (t *TensorInfo) IsConst() bool { return t.Const != nil }
 
 // Operator is one node of a subgraph.
 type Operator struct {
-	Index   int
-	Code    tflite.BuiltinOperator
-	Name    string
-	Version int
+	// Subgraph is the index of the enclosing subgraph, Index the position in it.
+	Subgraph int
+	Index    int
+	Code     tflite.BuiltinOperator
+	Name     string
+	Version  int
 	// Inputs and Outputs are tensor indices in the enclosing subgraph. An input of -1 marks an
 	// absent optional input.
 	Inputs  []int
@@ -238,7 +240,7 @@ func loadSubgraph(root *tflite.Model, sg *tflite.SubGraph, index int, codes []op
 			return out, fmt.Errorf("operator %d: opcode index %d out of range", i, ci)
 		}
 		oc := codes[ci]
-		o := Operator{Index: i, Code: oc.code, Name: oc.name, Version: int(oc.version), Variable: -1}
+		o := Operator{Subgraph: index, Index: i, Code: oc.code, Name: oc.name, Version: int(oc.version), Variable: -1}
 		for k := range op.InputsLength() {
 			idx := int(op.Inputs(k))
 			if idx < -1 || idx >= nt {
