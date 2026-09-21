@@ -23,6 +23,10 @@ func init() {
 	runtime.RegisterKernel(tflite.BuiltinOperatorDEPTHWISE_CONV_2D, depthwiseConv2D)
 	runtime.RegisterPrepare(tflite.BuiltinOperatorFULLY_CONNECTED, prepareFullyConnected)
 	runtime.RegisterKernel(tflite.BuiltinOperatorFULLY_CONNECTED, fullyConnected)
+	runtime.RegisterPrepare(tflite.BuiltinOperatorLOGISTIC, prepareLogistic)
+	runtime.RegisterKernel(tflite.BuiltinOperatorLOGISTIC, logistic)
+	runtime.RegisterPrepare(tflite.BuiltinOperatorQUANTIZE, prepareQuantize)
+	runtime.RegisterKernel(tflite.BuiltinOperatorQUANTIZE, quantize)
 }
 
 // maxDims bounds the rank of tensors handled by the kernels; the loader enforces it.

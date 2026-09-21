@@ -197,7 +197,7 @@ func TestPrepareRejectsInconsistentModels(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ts := base()
 			tc.mutate(ts)
-			err := tryNewSingleOp(t, tflite.BuiltinOperatorCONV_2D, opts, ts)
+			err := tryNewSingleOp(t, tflite.BuiltinOperatorCONV_2D, opts, ts, []int{0, 1, 2}, []int{3})
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("expected an error containing %q, got %v", tc.want, err)
 			}
@@ -206,7 +206,7 @@ func TestPrepareRejectsInconsistentModels(t *testing.T) {
 }
 
 // tryNewSingleOp is newSingleOp returning the NewInterpreter error instead of failing.
-func tryNewSingleOp(t *testing.T, code tflite.BuiltinOperator, opts any, tensors []tensorSpec) error {
+func tryNewSingleOp(t *testing.T, code tflite.BuiltinOperator, opts any, tensors []tensorSpec, inputs, outputs []int) error {
 	t.Helper()
 	infos := make([]runtime.TensorInfo, len(tensors))
 	for i, ts := range tensors {
@@ -229,8 +229,8 @@ func tryNewSingleOp(t *testing.T, code tflite.BuiltinOperator, opts any, tensors
 		}
 		infos[i] = info
 	}
-	op := runtime.Operator{Code: code, Name: tflite.EnumNamesBuiltinOperator[code], Inputs: []int{0, 1, 2}, Outputs: []int{3}, Options: opts, Variable: -1}
-	m := &runtime.Model{Version: 3, InitSubgraph: -1, Subgraphs: []runtime.Subgraph{{Name: "main", Tensors: infos, Operators: []runtime.Operator{op}, Inputs: []int{0}, Outputs: []int{3}}}}
+	op := runtime.Operator{Code: code, Name: tflite.EnumNamesBuiltinOperator[code], Inputs: inputs, Outputs: outputs, Options: opts, Variable: -1}
+	m := &runtime.Model{Version: 3, InitSubgraph: -1, Subgraphs: []runtime.Subgraph{{Name: "main", Tensors: infos, Operators: []runtime.Operator{op}, Inputs: inputs[:1], Outputs: outputs}}}
 	_, err := m.NewInterpreter()
 	return err
 }

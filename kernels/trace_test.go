@@ -202,8 +202,7 @@ func TestPhase2OperatorsAgainstTraces(t *testing.T) {
 }
 
 // TestResetAndInvokeState checks CALL_ONCE and Reset on real models: the first Invoke runs
-// the init subgraph, then stops at the first arithmetic operator; the state operators before
-// it produce what the oracle recorded at step 0.
+// the init subgraph; the READ_VARIABLE operators produce what the oracle recorded at step 0.
 func TestResetAndInvokeState(t *testing.T) {
 	for _, o := range loadOracles(t) {
 		t.Run(o.name, func(t *testing.T) {
@@ -218,21 +217,14 @@ func TestResetAndInvokeState(t *testing.T) {
 			if err := it.Input(0).SetBytes(tr.Tensors[o.file.Input.Index].Data); err != nil {
 				t.Fatal(err)
 			}
-			err = it.Invoke()
-			if err == nil {
-				t.Fatal("Invoke succeeded without the LOGISTIC kernel")
-			}
-			if !strings.Contains(err.Error(), "LOGISTIC") {
-				t.Fatalf("Invoke stopped elsewhere than the first LOGISTIC: %v", err)
+			if err := it.Invoke(); err != nil {
+				t.Fatal(err)
 			}
 			if !it.Initialized() {
 				t.Fatal("init subgraph did not run")
 			}
-			// Every READ_VARIABLE scheduled before the first LOGISTIC has run.
+			// Every READ_VARIABLE saw the freshly initialized state.
 			for _, op := range o.model.Main().Operators {
-				if op.Code == tflite.BuiltinOperatorLOGISTIC {
-					break
-				}
 				if op.Code != tflite.BuiltinOperatorREAD_VARIABLE {
 					continue
 				}

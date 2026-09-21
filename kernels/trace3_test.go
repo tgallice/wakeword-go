@@ -45,9 +45,11 @@ func compareOutputs(t *testing.T, it *runtime.Interpreter, op *runtime.Operator,
 	}
 }
 
-// TestPhase3OperatorsAgainstTraces runs every int8 arithmetic operator of every trace of every
-// model in isolation and compares its output byte for byte with the oracle.
-func TestPhase3OperatorsAgainstTraces(t *testing.T) {
+// checkOperatorsAgainstTraces runs every operator of the given kinds, in every trace of every
+// model, in isolation, and compares its output byte for byte with the oracle. It reports the
+// number of instances checked per operator kind.
+func checkOperatorsAgainstTraces(t *testing.T, ops map[tflite.BuiltinOperator]bool) {
+	t.Helper()
 	counts := map[string]int{}
 	for _, o := range loadOracles(t) {
 		t.Run(o.name, func(t *testing.T) {
@@ -58,7 +60,7 @@ func TestPhase3OperatorsAgainstTraces(t *testing.T) {
 			main := o.model.Main()
 			checked, expected := 0, 0
 			for _, op := range main.Operators {
-				if phase3Ops[op.Code] {
+				if ops[op.Code] {
 					expected++
 				}
 			}
@@ -66,7 +68,7 @@ func TestPhase3OperatorsAgainstTraces(t *testing.T) {
 				tr := &o.file.Traces[ti]
 				for oi := range main.Operators {
 					op := &main.Operators[oi]
-					if !phase3Ops[op.Code] {
+					if !ops[op.Code] {
 						continue
 					}
 					where := func(what string, idx int) string {
@@ -90,12 +92,18 @@ func TestPhase3OperatorsAgainstTraces(t *testing.T) {
 			}
 		})
 	}
-	for _, name := range []string{"CONV_2D", "DEPTHWISE_CONV_2D", "FULLY_CONNECTED"} {
+	for code := range ops {
+		name := tflite.EnumNamesBuiltinOperator[code]
 		if counts[name] == 0 {
 			t.Errorf("%s: no instance checked", name)
 		}
 		t.Logf("%-18s %6d instances checked", name, counts[name])
 	}
+}
+
+// TestPhase3OperatorsAgainstTraces checks CONV_2D, DEPTHWISE_CONV_2D and FULLY_CONNECTED.
+func TestPhase3OperatorsAgainstTraces(t *testing.T) {
+	checkOperatorsAgainstTraces(t, phase3Ops)
 }
 
 // TestArithmeticKernelsDoNotAllocate runs each Phase 3 operator kind of okay_nabu and checks
@@ -130,50 +138,5 @@ func TestArithmeticKernelsDoNotAllocate(t *testing.T) {
 	}
 	if len(seen) != len(phase3Ops) {
 		t.Errorf("only %d of %d operator kinds present in okay_nabu", len(seen), len(phase3Ops))
-	}
-}
-
-// TestInvokeStopsAtLogistic checks that a full Invoke now runs every operator up to the first
-// LOGISTIC, the first operator without a kernel until Phase 4.
-func TestInvokeStopsAtLogistic(t *testing.T) {
-	for _, o := range loadOracles(t) {
-		t.Run(o.name, func(t *testing.T) {
-			it, err := o.model.NewInterpreter()
-			if err != nil {
-				t.Fatal(err)
-			}
-			tr := &o.file.Traces[0]
-			if err := it.Input(0).SetBytes(tr.Tensors[o.file.Input.Index].Data); err != nil {
-				t.Fatal(err)
-			}
-			err = it.Invoke()
-			if err == nil {
-				t.Fatal("Invoke succeeded without LOGISTIC")
-			}
-			if !strings.Contains(err.Error(), "LOGISTIC") {
-				t.Fatalf("Invoke stopped elsewhere than the first LOGISTIC: %v", err)
-			}
-			// Everything before LOGISTIC ran in graph order from a fresh state: every tensor
-			// produced up to that point must match the oracle at sequence 0 step 0.
-			for _, op := range o.model.Main().Operators {
-				if op.Code == tflite.BuiltinOperatorLOGISTIC {
-					break
-				}
-				for k, idx := range op.Outputs {
-					out := it.Out(&op, k)
-					if out.Info.DType == runtime.Resource {
-						continue
-					}
-					want := tr.Tensors[idx].Data
-					for i := range out.Data {
-						if out.Data[i] != want[i] {
-							t.Errorf("operator %d (%s) tensor %d element %d: expected %d, got %d",
-								op.Index, op.Name, idx, i, int8(want[i]), int8(out.Data[i]))
-							break
-						}
-					}
-				}
-			}
-		})
 	}
 }

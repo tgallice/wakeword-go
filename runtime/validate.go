@@ -3,6 +3,7 @@ package runtime
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/tgallice/wakeword-go/tflite"
@@ -172,7 +173,24 @@ func (sg *Subgraph) validateOperator(m *Model, oi int) error {
 		if err := arity(1, 1); err != nil {
 			return err
 		}
-		return checkDTypes(in(0), Int8, out(0), Int8)
+		if err := checkDTypes(in(0), Int8, out(0), Int8); err != nil {
+			return err
+		}
+		// The int8 sigmoid of the reference kernels only produces the [0, 1] range mapped onto
+		// [-128, 127] in 1/256 steps (tflite-micro logistic_common.cc, TFLite activations.cc).
+		if out(0).Quant.PerChannel() {
+			return errors.New("output must have per-tensor quantization")
+		}
+		if zp := out(0).Quant.ZeroPoints[0]; zp != math.MinInt8 {
+			return fmt.Errorf("output zero point %d, the int8 sigmoid requires -128", zp)
+		}
+		if scale := out(0).Quant.Scales[0]; scale != 1.0/256 {
+			return fmt.Errorf("output scale %v, the int8 sigmoid requires 1/256", scale)
+		}
+		if in(0).NumElements != out(0).NumElements {
+			return errors.New("input and output element counts differ")
+		}
+		return nil
 	case tflite.BuiltinOperatorQUANTIZE:
 		if err := arity(1, 1); err != nil {
 			return err
