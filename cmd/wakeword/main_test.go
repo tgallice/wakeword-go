@@ -3,49 +3,22 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
-	"io"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/tgallice/wakeword-go/internal/wav"
 	"github.com/tgallice/wakeword-go/runtime"
 )
 
 const modelsDir = "../../testdata/models/v2"
 
-// writeWAV writes samples as a 16 kHz mono 16-bit PCM WAV.
-func writeWAV(w io.Writer, pcm []int16) error {
-	data := make([]byte, 2*len(pcm))
-	for i, s := range pcm {
-		binary.LittleEndian.PutUint16(data[2*i:], uint16(s))
-	}
-	var hdr [44]byte
-	copy(hdr[0:4], "RIFF")
-	binary.LittleEndian.PutUint32(hdr[4:8], uint32(36+len(data)))
-	copy(hdr[8:12], "WAVE")
-	copy(hdr[12:16], "fmt ")
-	binary.LittleEndian.PutUint32(hdr[16:20], 16)
-	binary.LittleEndian.PutUint16(hdr[20:22], 1)
-	binary.LittleEndian.PutUint16(hdr[22:24], wavChannels)
-	binary.LittleEndian.PutUint32(hdr[24:28], wavSampleRate)
-	binary.LittleEndian.PutUint32(hdr[28:32], wavSampleRate*wavChannels*wavBits/8)
-	binary.LittleEndian.PutUint16(hdr[32:34], wavChannels*wavBits/8)
-	binary.LittleEndian.PutUint16(hdr[34:36], wavBits)
-	copy(hdr[36:40], "data")
-	binary.LittleEndian.PutUint32(hdr[40:44], uint32(len(data)))
-	if _, err := w.Write(hdr[:]); err != nil {
-		return err
-	}
-	_, err := w.Write(data)
-	return err
-}
-
 func sine(n int, hz, amp float64) []int16 {
 	pcm := make([]int16, n)
 	for i := range pcm {
-		pcm[i] = int16(amp * math.Sin(2*math.Pi*hz*float64(i)/wavSampleRate))
+		pcm[i] = int16(amp * math.Sin(2*math.Pi*hz*float64(i)/wav.SampleRate))
 	}
 	return pcm
 }
@@ -54,7 +27,7 @@ func wavFile(t *testing.T, pcm []int16) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "in.wav")
 	var buf bytes.Buffer
-	if err := writeWAV(&buf, pcm); err != nil {
+	if err := wav.Write(&buf, pcm); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(path, buf.Bytes(), 0o644); err != nil {
@@ -66,10 +39,10 @@ func wavFile(t *testing.T, pcm []int16) string {
 func TestReadWAVRoundTrip(t *testing.T) {
 	pcm := sine(3200, 440, 8000)
 	var buf bytes.Buffer
-	if err := writeWAV(&buf, pcm); err != nil {
+	if err := wav.Write(&buf, pcm); err != nil {
 		t.Fatal(err)
 	}
-	got, err := readWAV(&buf)
+	got, err := wav.Read(&buf)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +59,7 @@ func TestReadWAVRoundTrip(t *testing.T) {
 func TestReadWAVSkipsChunksAndStreamingSize(t *testing.T) {
 	pcm := sine(160, 440, 1000)
 	var buf bytes.Buffer
-	if err := writeWAV(&buf, pcm); err != nil {
+	if err := wav.Write(&buf, pcm); err != nil {
 		t.Fatal(err)
 	}
 	b := buf.Bytes()
@@ -98,7 +71,7 @@ func TestReadWAVSkipsChunksAndStreamingSize(t *testing.T) {
 	out = append(out, b[36:40]...)
 	out = append(out, 0xFF, 0xFF, 0xFF, 0xFF)
 	out = append(out, b[44:]...)
-	got, err := readWAV(bytes.NewReader(out))
+	got, err := wav.Read(bytes.NewReader(out))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +83,7 @@ func TestReadWAVSkipsChunksAndStreamingSize(t *testing.T) {
 func TestReadWAVRejects(t *testing.T) {
 	good := func() []byte {
 		var buf bytes.Buffer
-		if err := writeWAV(&buf, sine(160, 440, 1000)); err != nil {
+		if err := wav.Write(&buf, sine(160, 440, 1000)); err != nil {
 			t.Fatal(err)
 		}
 		return buf.Bytes()
@@ -131,7 +104,7 @@ func TestReadWAVRejects(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := readWAV(bytes.NewReader(tc.mut(good())))
+			_, err := wav.Read(bytes.NewReader(tc.mut(good())))
 			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Errorf("error %v does not mention %q", err, tc.want)
 			}

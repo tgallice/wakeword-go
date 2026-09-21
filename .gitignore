@@ -2,3 +2,6 @@ tools/oracle/.venv/
 __pycache__/
 *.pyc
 /bin/
+tools/corpus/.venv/
+tools/corpus/corpus/
+tools/corpus/generate.log

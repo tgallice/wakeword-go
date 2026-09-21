@@ -1,0 +1,5 @@
+# Corpus generation only: never used by the Go code at runtime.
+piper-tts==1.8.0
+onnxruntime==1.29.0
+numpy==2.5.2
+scipy==1.18.1

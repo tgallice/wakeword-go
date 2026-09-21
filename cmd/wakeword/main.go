@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/tgallice/wakeword-go/frontend"
+	"github.com/tgallice/wakeword-go/internal/wav"
 	"github.com/tgallice/wakeword-go/wakeword"
 )
 
@@ -119,7 +120,7 @@ func audioSource(path string, raw bool, stdin io.Reader) (func(yield func([]int1
 			for {
 				n, err := io.ReadFull(br, buf)
 				if n > 0 {
-					if yerr := yield(decodePCM16(buf[:n])); yerr != nil {
+					if yerr := yield(wav.DecodePCM16(buf[:n])); yerr != nil {
 						return yerr
 					}
 				}
@@ -132,16 +133,9 @@ func audioSource(path string, raw bool, stdin io.Reader) (func(yield func([]int1
 			}
 		}, nil
 	}
-	f, err := os.Open(path)
+	pcm, err := wav.ReadFile(path)
 	if err != nil {
 		return nil, err
-	}
-	pcm, err := readWAV(bufio.NewReader(f))
-	if cerr := f.Close(); err == nil {
-		err = cerr
-	}
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return func(yield func([]int16) error) error {
 		const chunk = 1600 // 100 ms
@@ -212,7 +206,7 @@ func runDetect(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		if ev.BlockedByVAD {
 			what = "blocked by VAD"
 		}
-		out.printf("t=%.3fs %s %q avg=%.3f max=%.3f\n", float64(ev.Sample)/wavSampleRate,
+		out.printf("t=%.3fs %s %q avg=%.3f max=%.3f\n", float64(ev.Sample)/wav.SampleRate,
 			what, ev.WakeWord, float64(ev.AverageProbability)/255, float64(ev.MaxProbability)/255)
 		if err := out.flush(); err != nil { // events are rare, deliver them as they happen
 			warn(stderr, "wakeword: %v", err)
@@ -328,7 +322,7 @@ func runFeatures(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 				continue
 			}
 			frontend.QuantizeFeatures(int8s, features)
-			t := float64(fe.WindowSize()+frame*fe.WindowStep()) / wavSampleRate
+			t := float64(fe.WindowSize()+frame*fe.WindowStep()) / wav.SampleRate
 			out.printf("%d t=%.3fs u16:", frame, t)
 			for _, v := range features {
 				out.printf(" %d", v)

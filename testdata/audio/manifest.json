@@ -1,0 +1,189 @@
+[
+ {
+  "file": "positive/alexa_clean.wav",
+  "subset": "positive",
+  "word": "alexa",
+  "voice": "en_GB-jenny_dioco-medium",
+  "text": "Alexa",
+  "expected_start_s": 0.551,
+  "expected_end_s": 1.016,
+  "noise": null,
+  "source": "positive/alexa/en_GB-jenny_dioco-medium_ls0.8_ns0.5_1000030.wav"
+ },
+ {
+  "file": "positive/alexa_noisy.wav",
+  "subset": "positive",
+  "word": "alexa",
+  "voice": "en_US-ryan-medium",
+  "text": "Alexa",
+  "expected_start_s": 0.844,
+  "expected_end_s": 1.262,
+  "noise": "pink",
+  "source": "positive/alexa/en_US-ryan-medium_ls0.8_ns0.8_1000013.wav"
+ },
+ {
+  "file": "embedded/alexa_embedded.wav",
+  "subset": "embedded",
+  "word": "alexa",
+  "voice": "en_GB-alan-medium",
+  "text": "I was wondering. Alexa",
+  "expected_start_s": 2.216,
+  "expected_end_s": 2.994,
+  "noise": null,
+  "source": "embedded/alexa/en_GB-alan-medium_1000264.wav"
+ },
+ {
+  "file": "near_miss/alexa_near_miss.wav",
+  "subset": "near_miss",
+  "word": "alexa",
+  "voice": "en_GB-alan-medium",
+  "text": "A lexicon",
+  "expected_start_s": 0.822,
+  "expected_end_s": 1.763,
+  "noise": null,
+  "source": "near_miss/alexa/a_lexicon_en_GB-alan-medium_1000440.wav"
+ },
+ {
+  "file": "positive/hey_jarvis_clean.wav",
+  "subset": "positive",
+  "word": "hey_jarvis",
+  "voice": "en_GB-jenny_dioco-medium",
+  "text": "Hey Jarvis",
+  "expected_start_s": 1.368,
+  "expected_end_s": 2.077,
+  "noise": null,
+  "source": "positive/hey_jarvis/en_GB-jenny_dioco-medium_ls0.8_ns0.5_1000090.wav"
+ },
+ {
+  "file": "positive/hey_jarvis_noisy.wav",
+  "subset": "positive",
+  "word": "hey_jarvis",
+  "voice": "en_US-ryan-medium",
+  "text": "Hey Jarvis",
+  "expected_start_s": 1.233,
+  "expected_end_s": 1.848,
+  "noise": "pink",
+  "source": "positive/hey_jarvis/en_US-ryan-medium_ls0.8_ns0.8_1000073.wav"
+ },
+ {
+  "file": "embedded/hey_jarvis_embedded.wav",
+  "subset": "embedded",
+  "word": "hey_jarvis",
+  "voice": "en_GB-alan-medium",
+  "text": "I was wondering. Hey Jarvis",
+  "expected_start_s": 2.41,
+  "expected_end_s": 3.513,
+  "noise": null,
+  "source": "embedded/hey_jarvis/en_GB-alan-medium_1000300.wav"
+ },
+ {
+  "file": "near_miss/hey_jarvis_near_miss.wav",
+  "subset": "near_miss",
+  "word": "hey_jarvis",
+  "voice": "en_GB-alan-medium",
+  "text": "Hey Garvin",
+  "expected_start_s": 0.819,
+  "expected_end_s": 1.725,
+  "noise": null,
+  "source": "near_miss/hey_jarvis/hey_garvin_en_GB-alan-medium_1000488.wav"
+ },
+ {
+  "file": "positive/hey_mycroft_clean.wav",
+  "subset": "positive",
+  "word": "hey_mycroft",
+  "voice": "en_GB-jenny_dioco-medium",
+  "text": "Hey Mycroft",
+  "expected_start_s": 1.231,
+  "expected_end_s": 1.87,
+  "noise": null,
+  "source": "positive/hey_mycroft/en_GB-jenny_dioco-medium_ls0.8_ns0.5_1000150.wav"
+ },
+ {
+  "file": "positive/hey_mycroft_noisy.wav",
+  "subset": "positive",
+  "word": "hey_mycroft",
+  "voice": "en_US-ryan-medium",
+  "text": "Hey Mycroft",
+  "expected_start_s": 1.475,
+  "expected_end_s": 2.16,
+  "noise": "pink",
+  "source": "positive/hey_mycroft/en_US-ryan-medium_ls0.8_ns0.8_1000133.wav"
+ },
+ {
+  "file": "embedded/hey_mycroft_embedded.wav",
+  "subset": "embedded",
+  "word": "hey_mycroft",
+  "voice": "en_GB-jenny_dioco-medium",
+  "text": "Good morning. Hey Mycroft",
+  "expected_start_s": 1.619,
+  "expected_end_s": 2.49,
+  "noise": null,
+  "source": "embedded/hey_mycroft/en_GB-jenny_dioco-medium_1000342.wav"
+ },
+ {
+  "file": "near_miss/hey_mycroft_near_miss.wav",
+  "subset": "near_miss",
+  "word": "hey_mycroft",
+  "voice": "en_GB-alan-medium",
+  "text": "Hey Mike",
+  "expected_start_s": 0.733,
+  "expected_end_s": 1.476,
+  "noise": null,
+  "source": "near_miss/hey_mycroft/hey_mike_en_GB-alan-medium_1000548.wav"
+ },
+ {
+  "file": "positive/okay_nabu_clean.wav",
+  "subset": "positive",
+  "word": "okay_nabu",
+  "voice": "en_GB-jenny_dioco-medium",
+  "text": "Okay Nabu",
+  "expected_start_s": 0.625,
+  "expected_end_s": 1.484,
+  "noise": null,
+  "source": "positive/okay_nabu/en_GB-jenny_dioco-medium_ls0.8_ns0.5_1000210.wav"
+ },
+ {
+  "file": "positive/okay_nabu_noisy.wav",
+  "subset": "positive",
+  "word": "okay_nabu",
+  "voice": "en_US-ryan-medium",
+  "text": "Okay Nabu",
+  "expected_start_s": 0.661,
+  "expected_end_s": 1.322,
+  "noise": "white",
+  "source": "positive/okay_nabu/en_US-ryan-medium_ls0.8_ns0.8_1000193.wav"
+ },
+ {
+  "file": "embedded/okay_nabu_embedded.wav",
+  "subset": "embedded",
+  "word": "okay_nabu",
+  "voice": "en_GB-alan-medium",
+  "text": "I was wondering. Okay Nabu",
+  "expected_start_s": 2.566,
+  "expected_end_s": 3.69,
+  "noise": null,
+  "source": "embedded/okay_nabu/en_GB-alan-medium_1000372.wav"
+ },
+ {
+  "file": "near_miss/okay_nabu_near_miss.wav",
+  "subset": "near_miss",
+  "word": "okay_nabu",
+  "voice": "en_GB-alan-medium",
+  "text": "Okay Nadia",
+  "expected_start_s": 0.794,
+  "expected_end_s": 1.862,
+  "noise": null,
+  "source": "near_miss/okay_nabu/okay_nadia_en_GB-alan-medium_1000668.wav"
+ },
+ {
+  "file": "negative/speech_10s.wav",
+  "subset": "negative",
+  "word": "",
+  "voice": "en_GB-alan-medium",
+  "text": "The stadium holds sixty thousand people. The archive contains letters from the eighteen hundreds.",
+  "expected_start_s": 0.0,
+  "expected_end_s": 0.0,
+  "noise": null,
+  "source": "negative/en_GB-alan-medium_000.wav"
+ }
+]
