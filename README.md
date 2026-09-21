@@ -53,9 +53,16 @@ parec --format=s16le --rate=16000 --channels=1 --raw | wakeword detect --raw --m
 # Options: threshold and window overrides, VAD gating, blocked detections
 wakeword detect --model okay_nabu.tflite --cutoff 0.9 --vad vad.tflite --verbose clip.wav
 
+# Watch the raw model output every 30 ms while tuning the microphone gain or the cutoff
+wakeword detect --raw --probabilities --model hey_jarvis.tflite < capture.raw
+
 # Dump the 40 frontend features per 10 ms frame (uint16 and int8) for debugging
 wakeword features recording.wav
 ```
+
+Capture gain matters: a clipped input (peaks at full scale) yields a probability of 0 on
+every frame, and a very quiet one is not detected either. Aim for speech peaks around
+-6 to -3 dBFS, and check with `--probabilities` that the output rises on the wake word.
 
 Each detection prints one line: the time in seconds, the wake word, and the average and
 maximum probability over the sliding window. The manifest next to the model provides the

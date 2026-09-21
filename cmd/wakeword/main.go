@@ -85,6 +85,7 @@ detect options:
   --vad PATH         VAD model gating the detections
   --vad-config PATH  VAD manifest (default: the .json next to the VAD model)
   --verbose          also print detections blocked by the VAD
+  --probabilities    print the raw model output after every invocation (debugging)
 
 Audio is 16 kHz mono 16-bit PCM; --raw reads raw samples from stdin.`))
 	return exitUsage
@@ -164,6 +165,7 @@ func runDetect(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	raw := fs.Bool("raw", false, "raw PCM on stdin")
 	features := fs.String("features", "", "replay a testdata/frontend JSON file")
 	verbose := fs.Bool("verbose", false, "print detections blocked by the VAD")
+	probabilities := fs.Bool("probabilities", false, "print the raw model output after every invocation")
 	if err := fs.Parse(args); err != nil {
 		return exitUsage
 	}
@@ -193,11 +195,17 @@ func runDetect(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return usage(stderr)
 	}
 
-	det, err := loadDetector(*model, *config, *vad, *vadConfig, *cutoff, *window)
+	var onProb func(frame int, p uint8)
+	out := newOutWriter(stdout)
+	if *probabilities {
+		onProb = func(frame int, p uint8) {
+			out.printf("t=%.3fs p=%.3f\n", float64(frame*frontend.DefaultConfig().WindowStepMS)/1000, float64(p)/255)
+		}
+	}
+	det, err := loadDetector(*model, *config, *vad, *vadConfig, *cutoff, *window, onProb)
 	if err != nil {
 		return fail(stderr, err)
 	}
-	out := newOutWriter(stdout)
 	report := func(ev wakeword.Event) {
 		if ev.BlockedByVAD && !*verbose {
 			return
@@ -238,7 +246,9 @@ func runDetect(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	return exitOK
 }
 
-func loadDetector(model, config, vad, vadConfig string, cutoff float64, window int) (*wakeword.Detector, error) {
+func loadDetector(model, config, vad, vadConfig string, cutoff float64, window int,
+	onProb func(frame int, p uint8),
+) (*wakeword.Detector, error) {
 	modelBytes, err := os.ReadFile(model)
 	if err != nil {
 		return nil, err
@@ -247,7 +257,7 @@ func loadDetector(model, config, vad, vadConfig string, cutoff float64, window i
 	if err != nil {
 		return nil, err
 	}
-	opts := wakeword.Options{ProbabilityCutoff: cutoff, SlidingWindowSize: window}
+	opts := wakeword.Options{ProbabilityCutoff: cutoff, SlidingWindowSize: window, OnProbability: onProb}
 	if vad != "" {
 		if opts.VADModel, err = os.ReadFile(vad); err != nil {
 			return nil, err

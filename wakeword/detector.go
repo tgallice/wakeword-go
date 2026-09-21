@@ -46,6 +46,9 @@ type Options struct {
 	// VADProbabilityCutoff and VADSlidingWindowSize override the VAD manifest values when non-zero.
 	VADProbabilityCutoff float64
 	VADSlidingWindowSize int
+	// OnProbability, when set, is called after every wake word model invocation with the
+	// frame index and the raw output (0 to 255). Debugging and threshold tuning only.
+	OnProbability func(frame int, probability uint8)
 }
 
 // Detector runs one wake word model, and optionally a VAD model, over audio or features.
@@ -62,6 +65,7 @@ type Detector struct {
 	windowStep int
 	frames     int
 	events     []Event
+	onProb     func(frame int, probability uint8)
 }
 
 // NewDetector builds a detector from a model file, its manifest and options.
@@ -128,6 +132,7 @@ func newDetector(cfg ModelConfig, scorer Scorer, vadCfg ModelConfig, vadScorer S
 		windowSize: fe.WindowSize(),
 		windowStep: fe.WindowStep(),
 		events:     make([]Event, 0, 2),
+		onProb:     opts.OnProbability,
 	}
 	if vadScorer != nil {
 		vadCutoff, vadWindow := vadCfg.Micro.ProbabilityCutoff, vadCfg.Micro.SlidingWindowSize
@@ -174,6 +179,13 @@ func (d *Detector) FeatureSize() int { return d.model.featureSize }
 // Frames returns the number of frames fed since the last Reset.
 func (d *Detector) Frames() int { return d.frames }
 
+// LastProbability returns the most recent wake word model output (0 to 255) and whether a
+// new invocation happened during the last FeedFeatures call. It exists for debugging and
+// threshold tuning; the detection decision uses the sliding window, not this value alone.
+func (d *Detector) LastProbability() (p uint8, fresh bool) {
+	return d.model.ring[d.model.lastN], d.model.lastInvoked
+}
+
 // FeedFeatures feeds one frame of quantized int8 features (as produced by
 // frontend.QuantizeFeatures) to the models and reports a detection, if any. This is the
 // per-frame path of ESPHome's inference task: every model scores the frame, then the
@@ -186,6 +198,9 @@ func (d *Detector) FeedFeatures(frame []int8) (Event, bool, error) {
 		if err := d.vad.feed(frame); err != nil {
 			return Event{}, false, err
 		}
+	}
+	if d.onProb != nil && d.model.lastInvoked {
+		d.onProb(d.frames, d.model.ring[d.model.lastN])
 	}
 	ev, ok := d.process()
 	d.frames++

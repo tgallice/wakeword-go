@@ -24,6 +24,7 @@ type streamingModel struct {
 	lastN         int
 	ignoreWindows int
 	unprocessed   bool
+	lastInvoked   bool // set by feed when the frame completed a stride and the model ran
 }
 
 func newStreamingModel(s Scorer, cutoff uint8, window int) (*streamingModel, error) {
@@ -58,6 +59,7 @@ func (m *streamingModel) feed(frame []int8) error {
 	copy(m.input[m.strideStep*m.featureSize:], frame)
 	m.strideStep++
 
+	m.lastInvoked = false
 	if m.strideStep >= m.stride {
 		p, err := m.scorer.Invoke()
 		if err != nil {
@@ -69,6 +71,7 @@ func (m *streamingModel) feed(frame []int8) error {
 		}
 		m.ring[m.lastN] = p
 		m.unprocessed = true
+		m.lastInvoked = true
 	}
 	if m.ring[m.lastN] < m.cutoff {
 		// Only climb while below the cutoff: a sustained high probability keeps the model
