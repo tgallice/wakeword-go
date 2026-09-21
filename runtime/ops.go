@@ -5,14 +5,21 @@ import (
 )
 
 // Kernel executes one operator inside an interpreter. Kernels are registered by the kernels
-// package in later phases; an operator whose kernel is nil is loadable but not executable.
+// package; an operator whose kernel is nil is loadable but not executable.
 type Kernel func(it *Interpreter, op *Operator) error
 
-// opSpec describes one supported builtin operator: the versions accepted at load time and the
-// kernel used at execution time.
+// Prepare computes, once per interpreter, whatever an operator's kernel needs at execution
+// time (quantized multipliers, padding, activation bounds). NewInterpreter calls it for every
+// operator whose code has a prepare function and stores the result for Interpreter.Params.
+// A prepare error makes NewInterpreter fail, naming the operator.
+type Prepare func(it *Interpreter, op *Operator) (any, error)
+
+// opSpec describes one supported builtin operator: the versions accepted at load time, the
+// prepare step run at interpreter creation and the kernel used at execution time.
 type opSpec struct {
 	name     string
 	versions []int32
+	prepare  Prepare
 	kernel   Kernel
 }
 
@@ -47,6 +54,19 @@ func RegisterKernel(code tflite.BuiltinOperator, k Kernel) {
 		panic("runtime: kernel already registered for " + spec.name)
 	}
 	spec.kernel = k
+}
+
+// RegisterPrepare attaches the prepare step of a supported operator. Like RegisterKernel it is
+// a package initialization step and panics on an unsupported or already prepared operator.
+func RegisterPrepare(code tflite.BuiltinOperator, p Prepare) {
+	spec, ok := supportedOps[code]
+	if !ok {
+		panic("runtime: RegisterPrepare for unsupported operator " + builtinName(code))
+	}
+	if spec.prepare != nil {
+		panic("runtime: prepare already registered for " + spec.name)
+	}
+	spec.prepare = p
 }
 
 // builtinName returns the TFLite name of a builtin operator code, or a numeric fallback.

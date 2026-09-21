@@ -16,6 +16,8 @@ type tensorSpec struct {
 	// constant data, nil for a dynamic tensor
 	constInt8  []int8
 	constInt32 []int32
+	// quant overrides the default quantization (int8Quant for int8 tensors, none otherwise)
+	quant *runtime.Quantization
 }
 
 // int8Quant is the shared quantization of every int8 tensor of the synthetic models; the copy
@@ -33,7 +35,10 @@ func newSingleOp(t *testing.T, code tflite.BuiltinOperator, name string, opts an
 			info.NumElements *= d
 		}
 		info.ByteSize = info.NumElements * ts.dtype.Size()
-		if ts.dtype == runtime.Int8 {
+		switch {
+		case ts.quant != nil:
+			info.Quant = ts.quant
+		case ts.dtype == runtime.Int8:
 			info.Quant = int8Quant
 		}
 		switch {

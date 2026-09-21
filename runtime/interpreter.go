@@ -81,15 +81,23 @@ type Interpreter struct {
 	tensors [][]Tensor
 	// variables[i] is the state buffer of model.Variables[i]
 	variables [][]byte
+	// params[subgraph][index] holds what the operator's Prepare step computed, nil when the
+	// operator has no prepare step.
+	params [][]any
 	// initialized reports whether the init subgraph has run (CALL_ONCE semantics).
 	initialized bool
 }
 
-// NewInterpreter allocates every dynamic tensor of every subgraph and every state variable.
-// Constant tensors alias the model buffer. The init subgraph is not run here: Invoke runs it
-// once on first call (CALL_ONCE), Reset re-runs it.
+// NewInterpreter allocates every dynamic tensor of every subgraph and every state variable,
+// then runs the prepare step of every operator that has one. Constant tensors alias the model
+// buffer. The init subgraph is not run here: Invoke runs it once on first call (CALL_ONCE),
+// Reset re-runs it.
 func (m *Model) NewInterpreter() (*Interpreter, error) {
-	it := &Interpreter{model: m, tensors: make([][]Tensor, len(m.Subgraphs))}
+	it := &Interpreter{
+		model:   m,
+		tensors: make([][]Tensor, len(m.Subgraphs)),
+		params:  make([][]any, len(m.Subgraphs)),
+	}
 	for si := range m.Subgraphs {
 		sg := &m.Subgraphs[si]
 		it.tensors[si] = make([]Tensor, len(sg.Tensors))
@@ -109,6 +117,22 @@ func (m *Model) NewInterpreter() (*Interpreter, error) {
 	it.variables = make([][]byte, len(m.Variables))
 	for vi := range m.Variables {
 		it.variables[vi] = make([]byte, m.Variables[vi].ByteSize)
+	}
+	for si := range m.Subgraphs {
+		ops := m.Subgraphs[si].Operators
+		it.params[si] = make([]any, len(ops))
+		for oi := range ops {
+			op := &ops[oi]
+			p := supportedOps[op.Code].prepare
+			if p == nil {
+				continue
+			}
+			v, err := p(it, op)
+			if err != nil {
+				return nil, fmt.Errorf("subgraph %d operator %d (%s): prepare: %w", si, oi, op.Name, err)
+			}
+			it.params[si][oi] = v
+		}
 	}
 	return it, nil
 }
@@ -140,6 +164,9 @@ func (it *Interpreter) In(op *Operator, k int) *Tensor {
 func (it *Interpreter) Out(op *Operator, k int) *Tensor {
 	return &it.tensors[op.Subgraph][op.Outputs[k]]
 }
+
+// Params returns what the operator's Prepare step computed for this interpreter, or nil.
+func (it *Interpreter) Params(op *Operator) any { return it.params[op.Subgraph][op.Index] }
 
 // Variable returns the state buffer of a variable. Writing into the returned slice changes
 // the interpreter state.

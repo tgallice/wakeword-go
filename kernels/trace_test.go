@@ -220,18 +220,17 @@ func TestResetAndInvokeState(t *testing.T) {
 			}
 			err = it.Invoke()
 			if err == nil {
-				t.Fatal("Invoke succeeded without arithmetic kernels")
+				t.Fatal("Invoke succeeded without the LOGISTIC kernel")
 			}
-			if !strings.Contains(err.Error(), "CONV_2D") {
-				t.Fatalf("Invoke stopped elsewhere than the first CONV_2D: %v", err)
+			if !strings.Contains(err.Error(), "LOGISTIC") {
+				t.Fatalf("Invoke stopped elsewhere than the first LOGISTIC: %v", err)
 			}
 			if !it.Initialized() {
 				t.Fatal("init subgraph did not run")
 			}
-			// Only the READ_VARIABLE operators scheduled before the first arithmetic operator
-			// have run; in alexa and hey_mycroft some reads are interleaved with convolutions.
+			// Every READ_VARIABLE scheduled before the first LOGISTIC has run.
 			for _, op := range o.model.Main().Operators {
-				if op.Code == tflite.BuiltinOperatorCONV_2D {
+				if op.Code == tflite.BuiltinOperatorLOGISTIC {
 					break
 				}
 				if op.Code != tflite.BuiltinOperatorREAD_VARIABLE {

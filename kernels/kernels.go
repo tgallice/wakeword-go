@@ -1,6 +1,6 @@
-// Package kernels implements the operator kernels of the runtime: the copy operators of
-// Phase 2 and, in later phases, the int8 arithmetic operators. Importing the package registers
-// every kernel; importers that only need the loader can skip it.
+// Package kernels implements the operator kernels of the runtime: the copy operators, the int8
+// arithmetic operators and their prepare steps. Importing the package registers every kernel;
+// importers that only need the loader can skip it.
 //
 // Each kernel is a line-by-line port of the TensorFlow Lite reference implementation named in
 // its comment. Kernels never allocate: every scratch value lives on the stack in fixed-size
@@ -17,6 +17,12 @@ func init() {
 	runtime.RegisterKernel(tflite.BuiltinOperatorCONCATENATION, concatenation)
 	runtime.RegisterKernel(tflite.BuiltinOperatorSTRIDED_SLICE, stridedSlice)
 	runtime.RegisterKernel(tflite.BuiltinOperatorSPLIT_V, splitV)
+	runtime.RegisterPrepare(tflite.BuiltinOperatorCONV_2D, prepareConv)
+	runtime.RegisterKernel(tflite.BuiltinOperatorCONV_2D, conv2D)
+	runtime.RegisterPrepare(tflite.BuiltinOperatorDEPTHWISE_CONV_2D, prepareDepthwiseConv)
+	runtime.RegisterKernel(tflite.BuiltinOperatorDEPTHWISE_CONV_2D, depthwiseConv2D)
+	runtime.RegisterPrepare(tflite.BuiltinOperatorFULLY_CONNECTED, prepareFullyConnected)
+	runtime.RegisterKernel(tflite.BuiltinOperatorFULLY_CONNECTED, fullyConnected)
 }
 
 // maxDims bounds the rank of tensors handled by the kernels; the loader enforces it.
