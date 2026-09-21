@@ -1,0 +1,3 @@
+microWakeWord v2 models, copied from https://github.com/esphome/micro-wake-word-models
+(commit 05b65922cc433c9df13e98e32a7fe520758c837e), Apache 2.0 license.
+Author: Kevin Ahrendt. See tools/oracle/download_models.sh to re-download them.

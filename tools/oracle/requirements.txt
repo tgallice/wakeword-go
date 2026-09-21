@@ -1,0 +1,5 @@
+# Python oracles: only used to generate the golden vectors, never at runtime.
+ai-edge-litert==2.2.0     # TFLite interpreter (BUILTIN_REF resolver = reference kernels)
+tflite==2.18.0            # FlatBuffers reading of the TFLite schema (graph structure)
+pymicro-features==2.0.2   # C binding of the tflite-micro microfrontend (features oracle)
+numpy>=1.26

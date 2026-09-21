@@ -1,0 +1,28 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - revive
+    - misspell
+    - gocritic
+  settings:
+    revive:
+      rules:
+        - name: exported
+    misspell:
+      locale: US
+
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
